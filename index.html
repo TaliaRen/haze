@@ -1374,7 +1374,7 @@ function showMood(k){
   drawWelcome();
 }
 // From the editor (logo click) or on a visit with saved work, the main button
-// continues that design; "New design" begins fresh.
+// continues that design; "New design" starts from a blank canvas.
 function openWelcome(fromEditor=false){
   closePicker(true);closePops();hideMenu();
   const hasWork=fromEditor||!!SAVED;
@@ -1391,7 +1391,12 @@ function closeWelcome(){
   setTimeout(()=>{w.hidden=true;w.classList.remove('leaving');cancelAnimationFrame(W.raf);W.raf=0;syncAnim();},550);
 }
 $('wGo').onclick=closeWelcome;
-$('wNew').onclick=()=>{applyPreset(START);closeWelcome();};
+// New design = a blank canvas with default effects (the canvas ratio is kept).
+function newDesign(){
+  state.blur=DEF.blur;state.grain=DEF.grain;state.motion=JSON.parse(JSON.stringify(DEF.motion));ui.paused=false;
+  applyPreset(presetData.findIndex(p=>p.name==='Blank'));
+}
+$('wNew').onclick=()=>{newDesign();closeWelcome();};
 $('btnHome').onclick=()=>openWelcome(true);
 window.addEventListener('resize',()=>{if(!$('welcome').hidden)drawWelcome();});
 
