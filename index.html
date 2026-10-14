@@ -507,7 +507,7 @@ const PRESETS=[
   {name:'Lavender',bg:'#ad97d6',layers:['#9d86cf','#f0d3dc','#8a8fd4','#f2dccb'],seed:7},
   {name:'Sage',bg:'#bfcca9',layers:['#9fb797','#f4e6c3','#97b190','#f6e8c6'],seed:5},
   {name:'Grass',bg:'#58b26d',layers:['#38a85a','#c4e27a','#8dd3e0','#c8e47e'],seed:9},
-  {name:'Peach',bg:'#f5bfaa',layers:['#f4a98c','#fde6d6','#f1a3bd','#fde8d9'],seed:13},
+  {name:'Sunset',bg:'#f5bfaa',layers:['#f4a98c','#fde6d6','#f1a3bd','#fde8d9'],seed:13},
   {name:'Dusk',bg:'#4a4994',layers:['#2b3c80','#7b63d6','#ea85b4','#7f68d9'],seed:21},
 ];
 const presetData=PRESETS.map(p=>{
@@ -1144,7 +1144,6 @@ $('btnShuffle').onclick=shuffle;$('btnShuffleColors').onclick=shuffleColors;$('b
 const PALETTES=PRESETS.filter(p=>p.layers.length).map(p=>({name:p.name,bg:p.bg,colors:p.layers})).concat([
   {name:'Mint',bg:'#97cdd5',colors:['#6fb9cc','#d8eaa6','#a8dccd','#dcedab']},
   {name:'Ocean',bg:'#3a7fb0',colors:['#1f4e79','#4fa3c7','#a6dcef','#e6f6fb']},
-  {name:'Sunset',bg:'#f2a07b',colors:['#e9706b','#f7c59f','#b56db8','#fde2c4']},
   {name:'Rose',bg:'#e7b3bd',colors:['#d77f94','#f6dbe0','#c49bbb','#fbeef0']},
   {name:'Citrus',bg:'#f2cf5b',colors:['#f6a33b','#fbeaa0','#9fd36a','#fff6d8']},
   {name:'Mono',bg:'#c9c9c4',colors:['#8f8f8a','#e9e8e3','#b3b3ad','#f7f6f2']},
@@ -1333,7 +1332,7 @@ function renderAll(){renderPresets();renderLayers();renderLook();renderMotion();
    Only a moving gradient, the name and one button. The background slowly
    drifts between a few moods to show what Haze makes. */
 const REDUCED=matchMedia('(prefers-reduced-motion: reduce)').matches;
-const W_MOODS=['Sky','Lavender','Peach','Sage','Grass'].map(n=>presetData.findIndex(p=>p.name===n)).filter(i=>i>=0);
+const W_MOODS=['Sky','Lavender','Sunset','Sage','Grass'].map(n=>presetData.findIndex(p=>p.name===n)).filter(i=>i>=0);
 const W={k:0,raf:0,timer:0,state:null};
 // The welcome page opens every time Haze is opened.
 function shouldWelcome(){return true;}

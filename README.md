@@ -16,13 +16,13 @@ No sign-up, no install. It runs entirely in your browser.
 <p align="center">
   <img src="docs/sample-sky.jpg" width="190" alt="Sky">
   <img src="docs/sample-lavender.jpg" width="190" alt="Lavender">
-  <img src="docs/sample-peach.jpg" width="190" alt="Peach">
+  <img src="docs/sample-sunset.jpg" width="190" alt="Sunset">
   <img src="docs/sample-dusk.jpg" width="190" alt="Dusk">
 </p>
 
 ## Features
 
-- **Start from a mood.** Sky, Lavender, Sage, Grass, Peach and Dusk, or a blank canvas.
+- **Start from a mood.** Sky, Lavender, Sage, Grass, Sunset and Dusk, or a blank canvas.
 - **Shape it on the canvas.** Drag a dot to move a shape. Use its handles to resize, rotate and stretch it.
 - **Colors that fit.** Every color picker suggests six colors that match the rest of your picture, or you can pick your own.
 - **Recolor.** Keep the layout you love and try a whole new palette. Hover to preview, click to apply.
