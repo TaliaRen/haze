@@ -155,7 +155,7 @@
   .sec h3{margin:0 0 12px; font-size:13px; color:var(--text); font-weight:600; display:flex; align-items:center; gap:8px; min-height:24px}
   .sec h3 .meta{font-size:12px; font-weight:400; color:var(--faint)}
 
-  .presets{display:grid; grid-template-columns:repeat(7,minmax(0,1fr)); gap:7px}
+  .presets{display:grid; grid-template-columns:repeat(7,minmax(0,48px)); gap:7px; justify-content:start}
   .preset{position:relative; border:0; padding:0; background:none; cursor:pointer; display:block; min-width:0}
   .preset canvas, .preset .blank{display:block; width:100%; aspect-ratio:1; height:auto; border-radius:8px; box-shadow:inset 0 0 0 1px rgba(0,0,0,.06), 0 0 0 1px rgba(0,0,0,.05); transition:transform .15s, box-shadow .15s}
   .preset .blank{display:flex; align-items:center; justify-content:center; background:#fff; box-shadow:none; border:1.5px dashed #c6c6c0; color:var(--faint)}
@@ -210,6 +210,18 @@
   .pop{position:fixed; z-index:55; width:290px; padding:14px; background:#fff; border-radius:14px; box-shadow:0 14px 44px rgba(0,0,0,.16), 0 0 0 1px rgba(0,0,0,.06)}
   .pop-title{display:flex; align-items:center; gap:8px; margin:0 0 12px; font-weight:600; font-size:13px}
   .pop .lbl{width:52px}
+  /* Recolor: same layout, a different palette */
+  .pop.rc{width:276px; padding:12px; max-height:min(560px,calc(100vh - 24px)); overflow-y:auto}
+  .rc-head{display:flex; align-items:baseline; justify-content:space-between; margin:2px 4px 10px; font-weight:600; font-size:13px}
+  .rc-head span{font-weight:400; font-size:12px; color:var(--faint)}
+  .rc-surprise{width:100%; justify-content:center; margin-bottom:8px}
+  .rc-row{display:flex; align-items:center; gap:10px; width:100%; border:0; background:none; padding:7px 6px; border-radius:9px; cursor:pointer; text-align:left}
+  .rc-row:hover{background:var(--chip)}
+  .rc-row.on{background:var(--chip); box-shadow:inset 0 0 0 1px var(--line2)}
+  .rc-row b{width:66px; flex:none; font-weight:500; font-size:12.5px}
+  .rc-strip{flex:1; display:flex; height:22px; border-radius:6px; overflow:hidden; box-shadow:inset 0 0 0 1px rgba(0,0,0,.06)}
+  .rc-strip i{flex:1}
+  .rc-strip i:first-child{flex:1.4}
   /* Preview button: red "live" look while playing, solid black when paused */
   #btnPause{margin-top:12px; gap:8px; font-weight:500}
   #btnPause.live{background:#fdeeed; border-color:#f3cbc8; color:#c2372f}
@@ -332,6 +344,7 @@
     <div class="floatbar" id="toolbar">
       <button class="tb" id="btnShuffle" aria-label="Shuffle layout" data-tip="Shuffle layout · R"><span data-icon="shuffle" data-size="18"></span></button>
       <button class="tb" id="btnShuffleColors" aria-label="Shuffle colors" data-tip="Shuffle colors · C"><span data-icon="palette" data-size="18"></span></button>
+      <button class="tb" id="btnRecolor" data-pop aria-label="Recolor" data-tip="Recolor · P"><span data-icon="swatches" data-size="18"></span></button>
       <span class="tsep"></span>
       <button class="tb" id="btnHandles" aria-label="Hide controls" data-tip="Hide controls · H"><span id="handlesIcon"></span></button>
     </div>
@@ -363,6 +376,12 @@
 </main>
 
 <div class="menu" id="menu" role="menu" hidden></div>
+
+<div class="pop rc" id="recolorPop" hidden role="menu" aria-label="Recolor">
+  <div class="rc-head">Recolor <span>Keeps your layout</span></div>
+  <button class="btn sm rc-surprise" id="rcSurprise"><span data-icon="sparkle" data-size="14"></span>Surprise me</button>
+  <div id="rcList"></div>
+</div>
 
 <div class="pop" id="motionPop" hidden>
   <div class="pop-title">Motion</div>
@@ -423,6 +442,8 @@ const ICONS={
   pause:'<path d="M8 5v14M16 5v14"/>',
   image:'<rect x="4" y="5" width="16" height="14" rx="2.5"/><circle cx="9" cy="10" r="1.5"/><path d="m20 16-5-5-8 8"/>',
   wave:'<path d="M3 9c2-2.5 4-2.5 6 0s4 2.5 6 0 4-2.5 6 0"/><path d="M3 15c2-2.5 4-2.5 6 0s4 2.5 6 0 4-2.5 6 0"/>',
+  swatches:'<circle cx="9" cy="9.5" r="5"/><circle cx="15" cy="9.5" r="5"/><circle cx="12" cy="15" r="5"/>',
+  sparkle:'<path d="M12 3l1.8 4.7 4.7 1.8-4.7 1.8L12 16l-1.8-4.7-4.7-1.8 4.7-1.8z"/><path d="M19 15l.7 1.8 1.8.7-1.8.7L19 20l-.7-1.8-1.8-.7 1.8-.7z"/>',
   sliders:'<path d="M4 7h9M17 7h3M4 17h3M11 17h9"/><circle cx="15" cy="7" r="2"/><circle cx="9" cy="17" r="2"/>',
 };
 const icon=(n,s=16)=>`<svg width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">${ICONS[n]}</svg>`;
@@ -929,7 +950,10 @@ function togglePop(id,anchor,align){
   const r=anchor.getBoundingClientRect(),w=p.offsetWidth,left=align==='center'?r.left+r.width/2-w/2:r.right-w;
   p.style.left=clamp(left,8,innerWidth-w-8)+'px';p.style.top=(r.bottom+8)+'px';
 }
-function closePops(){document.querySelectorAll('.pop').forEach(p=>{p.hidden=true;if(p.dataset.anchor)$(p.dataset.anchor)?.classList.remove('pressed');});}
+function closePops(){
+  if(!$('recolorPop').hidden&&RC.base)setColors(RC.base); // drop a hover preview that wasn't clicked
+  document.querySelectorAll('.pop').forEach(p=>{p.hidden=true;if(p.dataset.anchor)$(p.dataset.anchor)?.classList.remove('pressed');});
+}
 document.addEventListener('pointerdown',e=>{if(!e.target.closest('.pop,[data-pop]'))closePops();},true);
 window.addEventListener('resize',closePops);
 $('btnMotionSettings').onclick=()=>togglePop('motionPop',$('btnMotionSettings'),'center');
@@ -1105,6 +1129,58 @@ function renderToolbar(){
 }
 $('btnShuffle').onclick=shuffle;$('btnShuffleColors').onclick=shuffleColors;$('btnHandles').onclick=toggleHandles;
 
+/* ================= Recolor =================
+   Keep every shape exactly where it is and swap in a whole new palette.
+   Colors are matched by lightness: the lightest shape gets the palette's lightest
+   color, the darkest gets the darkest, so the picture's light and shade survive. */
+const PALETTES=PRESETS.filter(p=>p.layers.length).map(p=>({name:p.name,bg:p.bg,colors:p.layers})).concat([
+  {name:'Mint',bg:'#97cdd5',colors:['#6fb9cc','#d8eaa6','#a8dccd','#dcedab']},
+  {name:'Ocean',bg:'#3a7fb0',colors:['#1f4e79','#4fa3c7','#a6dcef','#e6f6fb']},
+  {name:'Sunset',bg:'#f2a07b',colors:['#e9706b','#f7c59f','#b56db8','#fde2c4']},
+  {name:'Rose',bg:'#e7b3bd',colors:['#d77f94','#f6dbe0','#c49bbb','#fbeef0']},
+  {name:'Citrus',bg:'#f2cf5b',colors:['#f6a33b','#fbeaa0','#9fd36a','#fff6d8']},
+  {name:'Mono',bg:'#c9c9c4',colors:['#8f8f8a','#e9e8e3','#b3b3ad','#f7f6f2']},
+]);
+const lightOf=h=>rgbToHsl(hexToRgb(h))[2];
+const RC={base:null,active:null};
+const colorsNow=()=>({bg:state.bg,hexes:state.layers.map(l=>l.hex)});
+function mapPalette(pal,base){
+  const n=base.hexes.length,cols=pal.colors.slice().sort((a,b)=>lightOf(a)-lightOf(b)),m=cols.length;
+  const order=base.hexes.map((h,i)=>i).sort((a,b)=>lightOf(base.hexes[a])-lightOf(base.hexes[b]));
+  const hexes=new Array(n);
+  order.forEach((idx,rank)=>{hexes[idx]=cols[n<=1?m-1:Math.round(rank*(m-1)/(n-1))];});
+  return {bg:pal.bg,hexes};
+}
+function setColors(c){state.bg=c.bg;state.layers.forEach((l,i)=>{if(c.hexes[i])l.hex=c.hexes[i];});renderLayers();renderHandles();requestRender();}
+// A fresh, harmonious palette: one base hue, close neighbours, a spread of light and dark.
+function surprisePalette(){
+  const h=rnd(0,360),s=rnd(38,72),dir=Math.random()<.5?-1:1;
+  const colors=[[h,s,rnd(42,55)],[h+dir*rnd(15,30),s*.9,rnd(62,72)],[h-dir*rnd(10,25),s*.6,rnd(84,93)],[h+dir*rnd(30,50),s*.8,rnd(52,66)]].map(hslHex);
+  return {name:'Surprise',bg:hslHex([h+dir*8,s*.75,rnd(62,72)]),colors};
+}
+function renderRecolor(){
+  const box=$('rcList');box.innerHTML='';
+  PALETTES.forEach(pal=>{
+    const b=document.createElement('button');b.className='rc-row'+(RC.active===pal.name?' on':'');b.setAttribute('role','menuitem');
+    b.innerHTML=`<b>${pal.name}</b><span class="rc-strip">${[pal.bg,...pal.colors].map(h=>`<i style="background:${h}"></i>`).join('')}</span>`;
+    b.onmouseenter=()=>{flush();setColors(mapPalette(pal,RC.base));};
+    b.onmouseleave=()=>setColors(RC.base);
+    b.onclick=()=>{setColors(mapPalette(pal,RC.base));RC.base=colorsNow();RC.active=pal.name;commit(true);renderRecolor();};
+    box.appendChild(b);
+  });
+}
+function openRecolor(){
+  const p=$('recolorPop'),a=$('btnRecolor');
+  if(!p.hidden){closePops();return;}
+  closePops();closePicker(true);hideMenu();
+  RC.base=colorsNow();RC.active=null;renderRecolor();
+  p.hidden=false;a.classList.add('pressed');p.dataset.anchor='btnRecolor';
+  const r=a.getBoundingClientRect(),h=p.offsetHeight,w=p.offsetWidth;
+  p.style.left=clamp(r.right+10,8,innerWidth-w-8)+'px';p.style.top=clamp(r.top+r.height/2-h/2,8,innerHeight-h-8)+'px';
+}
+$('btnRecolor').onclick=openRecolor;
+$('rcSurprise').onclick=()=>{setColors(mapPalette(surprisePalette(),RC.base));RC.base=colorsNow();RC.active=null;commit(true);renderRecolor();};
+
 /* ================= Color picker =================
    One picker for every color: a shape's color or the background. Recommended
    colors sit on top (hover to preview on the canvas), a full picker below. */
@@ -1222,6 +1298,7 @@ window.addEventListener('keydown',e=>{
   if(k==='h'){toggleHandles();return;}
   if(k==='r'){shuffle();return;}
   if(k==='c'){shuffleColors();return;}
+  if(k==='p'){openRecolor();return;}
   if(k==='m'){setMotion(!state.motion.on);return;}
   if(e.key.startsWith('Arrow')&&ui.sel&&!isRange){
     e.preventDefault();const b=selLayer(),st=e.shiftKey?.03:.006;
