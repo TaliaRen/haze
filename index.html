@@ -332,7 +332,7 @@
   <button class="ib" id="btnUndo" title="Undo (⌘Z)" data-icon="undo"></button>
   <button class="ib" id="btnRedo" title="Redo (⇧⌘Z)" data-icon="redo"></button>
   <div class="vsep"></div>
-  <button class="btn primary" id="btnExportTop" data-pop title="Export (⌘E exports right away)"><span data-icon="download"></span><span class="lab">Export</span></button>
+  <button class="btn primary" id="btnExportTop" data-pop title="Export"><span data-icon="download"></span><span class="lab">Export</span></button>
 </header>
 
 <main>
@@ -926,8 +926,6 @@ async function exportVideo(){
   ui.exporting=false;top.disabled=false;top.innerHTML=icon('download')+'<span class="lab">Export</span>';renderExport();syncAnim();
   download(new Blob(chunks,{type:mime.split(';')[0]}),fmt);
 }
-// ⌘E repeats the last kind of export (image or video).
-function doExport(){if(ui.exporting)return;ui.exportTab==='video'?exportVideo():exportImage();}
 
 /* ================= Motion ================= */
 function setMotion(on){
@@ -1085,7 +1083,7 @@ function layerMenu(x,y){
   const full=state.layers.length>=MAX_LAYERS;
   showMenu(x,y,[
     {icon:'edit',label:'Change color',run:()=>{const sw=document.querySelector(`.lrow[data-id="${ui.sel}"] .sw`);if(sw)openPicker({kind:'layer',id:ui.sel},sw);}},
-    {icon:'copy',label:'Duplicate',kbd:'⌘D',disabled:full,run:duplicateLayer},
+    {icon:'copy',label:'Duplicate',disabled:full,run:duplicateLayer},
     {icon:'up',label:'Bring to front',run:()=>moveLayer(true)},
     {icon:'down',label:'Send to back',run:()=>moveLayer(false)},
     '-',
@@ -1101,7 +1099,7 @@ function renderCtx(){
   const sep=document.createElement('span');sep.className='sep';
   bar.append(sw,sep);
   const mk=(ic,title,fn,cls='',dis=false)=>{const btn=document.createElement('button');btn.className='ib '+cls;btn.title=title;btn.innerHTML=icon(ic);btn.onclick=fn;btn.disabled=dis;bar.appendChild(btn);};
-  mk('copy','Duplicate (⌘D)',duplicateLayer,'',state.layers.length>=MAX_LAYERS);
+  mk('copy','Duplicate',duplicateLayer,'',state.layers.length>=MAX_LAYERS);
   mk('trash','Delete (⌫)',()=>deleteLayer(),'danger');
   positionCtx();
 }
@@ -1292,7 +1290,6 @@ window.addEventListener('keydown',e=>{
   if(mod&&k==='z'&&!typing){e.preventDefault();e.shiftKey?redo():undo();return;}
   if(mod&&k==='y'&&!typing){e.preventDefault();redo();return;}
   if(typing)return;
-  if(mod&&k==='e'){e.preventDefault();doExport();return;}
   if(e.key==='Escape'){
     if(document.querySelector('.pop:not([hidden])')){closePops();return;}
     if(!menu.hidden){hideMenu();return;}
@@ -1300,7 +1297,6 @@ window.addEventListener('keydown',e=>{
     return;
   }
   if((e.key==='Delete'||e.key==='Backspace')&&ui.sel){e.preventDefault();deleteLayer();return;}
-  if(mod&&k==='d'&&ui.sel){e.preventDefault();duplicateLayer();return;}
   if(mod)return;
   if(k==='h'){toggleHandles();return;}
   if(k==='r'){shuffle();return;}

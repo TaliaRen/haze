@@ -3,8 +3,9 @@
 </p>
 
 <p align="center">
-  <b>Soft, flowing gradients. Still or in motion.</b><br>
-  <a href="https://taliaren.github.io/haze/">Open Haze</a>
+  <b>Soft, flowing gradients. Still or in motion.</b><br><br>
+  <a href="https://taliaren.github.io/haze/"><b>→ Open Haze in your browser</b></a><br>
+  <sub>taliaren.github.io/haze</sub>
 </p>
 
 ---
@@ -40,23 +41,9 @@ No sign-up, no install. It runs entirely in your browser.
 | `P` | Open Recolor |
 | `M` | Switch between Still and Motion |
 | `H` | Hide or show the on-canvas controls |
-| `⌘D` | Duplicate the selected shape |
 | `Delete` | Delete the selected shape |
 | Arrow keys | Nudge the selected shape (hold `Shift` for bigger steps) |
 | `⌘Z` / `⇧⌘Z` | Undo / redo |
-| `⌘E` | Export again with the last format |
-
-## Run it locally
-
-Haze is a single `index.html` file with no dependencies and no build step.
-
-```bash
-git clone https://github.com/TaliaRen/haze.git
-cd haze
-python3 -m http.server 8000
-```
-
-Then open <http://localhost:8000>. Opening `index.html` directly also works.
 
 ## How it works
 
@@ -69,7 +56,3 @@ Then open <http://localhost:8000>. Opening `index.html` directly also works.
 ## Browser support
 
 Works in the latest Chrome, Edge, Safari and Firefox. Video export depends on the browser: MP4 in Chrome and Safari, WebM in Chrome and Firefox. The eyedropper is available in Chrome and Edge.
-
-## Author
-
-Designed by [Talia Ren](https://www.taliarendesign.com).
