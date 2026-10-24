@@ -169,6 +169,7 @@
   .preset .blank{display:flex; align-items:center; justify-content:center; background:#fff; box-shadow:none; border:1.5px dashed #c6c6c0; color:var(--faint)}
   .preset:hover canvas, .preset:hover .blank{transform:translateY(-2px)}
   .preset:hover .blank{color:var(--text); border-color:#a9a9a3}
+  #patterns{margin-top:-2px}
   .preset.on canvas, .preset.on .blank{box-shadow:0 0 0 2px #fff, 0 0 0 3.5px var(--accent)}
   /* Name appears on hover only */
   .preset::after{
@@ -377,6 +378,12 @@
     </section>
 
     <section class="sec">
+      <h3>Pattern</h3>
+      <div class="presets" id="patterns"></div>
+      <div id="patternSliders" style="margin-top:6px"></div>
+    </section>
+
+    <section class="sec">
       <h3>Effects</h3>
       <div id="lookSliders"></div>
     </section>
@@ -438,6 +445,7 @@ const ICONS={
   eye:'<path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/>',
   eyeoff:'<path d="m3 3 18 18"/><path d="M10.6 5.1A10 10 0 0 1 12 5c6.5 0 10 7 10 7a17 17 0 0 1-3.2 4.2"/><path d="M6.6 6.6A17 17 0 0 0 2 12s3.5 7 10 7a9.7 9.7 0 0 0 5.4-1.6"/><path d="M9.9 9.9a3 3 0 0 0 4.2 4.2"/>',
   plus:'<path d="M12 5v14M5 12h14"/>',
+  none:'<circle cx="12" cy="12" r="8"/><path d="m6.5 17.5 11-11"/>',
   x:'<path d="M6 6l12 12M18 6 6 18"/>',
   trash:'<path d="M4 7h16"/><path d="M10 11v6M14 11v6"/><path d="M6 7l1 13h10l1-13"/><path d="M9 7V4h6v3"/>',
   copy:'<rect x="8" y="8" width="12" height="12" rx="2"/><path d="M16 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h2"/>',
@@ -477,6 +485,34 @@ function hsvToRgb([h,s,v]){const f=n=>{const k=(n+h/60)%6;return v-v*s*Math.max(
 function normHex(s){s=String(s).trim().replace(/^#/,'');if(/^[0-9a-f]{3}$/i.test(s))s=s.split('').map(c=>c+c).join('');return /^[0-9a-f]{6}$/i.test(s)?'#'+s.toLowerCase():null;}
 function mixHex(a,b,t=.5){const A=hexToRgb(a),B=hexToRgb(b);return rgbToHex(A.map((v,i)=>v+(B[i]-v)*t));}
 function dist(a,b){const A=hexToRgb(a),B=hexToRgb(b);return Math.hypot(A[0]-B[0],A[1]-B[1],A[2]-B[2]);}
+/* OKLab: a color space where equal steps look equal to the eye. Mixing here
+   avoids the grey, muddy middles you get when mixing in plain RGB. */
+const LIN=new Float32Array(256);for(let i=0;i<256;i++){const c=i/255;LIN[i]=c<=.04045?c/12.92:Math.pow((c+.055)/1.055,2.4);}
+const ENC=new Uint8ClampedArray(4096);for(let i=0;i<4096;i++){const l=i/4095;ENC[i]=Math.round(255*(l<=.0031308?12.92*l:1.055*Math.pow(l,1/2.4)-.055));}
+const enc=v=>ENC[(v<0?0:v>1?1:v)*4095|0];
+function linToOklab(r,g,b){
+  const l=Math.cbrt(.4122214708*r+.5363325363*g+.0514459929*b),m=Math.cbrt(.2119034982*r+.6806995451*g+.1073969566*b),q=Math.cbrt(.0883024619*r+.2817188376*g+.6299787005*b);
+  return [.2104542553*l+.793617785*m-.0040720468*q,1.9779984951*l-2.428592205*m+.4505937099*q,.0259040371*l+.7827717662*m-.808675766*q];
+}
+function oklabToLin(L,a,b){
+  const l_=L+.3963377774*a+.2158037573*b,m_=L-.1055613458*a-.0638541728*b,q_=L-.0894841775*a-1.291485548*b;
+  const l=l_*l_*l_,m=m_*m_*m_,q=q_*q_*q_;
+  return [4.0767416621*l-3.3077115913*m+.2309699292*q,-1.2684380046*l+2.6097574011*m-.3413193965*q,-.0041960863*l-.7034186147*m+1.707614701*q];
+}
+function hexToOklab(h){const [r,g,b]=hexToRgb(h);return linToOklab(LIN[r],LIN[g],LIN[b]);}
+function hexToOklch(h){const [L,a,b]=hexToOklab(h);return [L,Math.hypot(a,b),(Math.atan2(b,a)*180/Math.PI+360)%360];}
+// OKLCH → hex, lowering chroma until the color fits in sRGB
+function oklchToHex([L,C,H]){
+  L=clamp(L,0,1);let c=Math.max(0,C);const hr=H*Math.PI/180;
+  for(let t=0;t<40;t++){
+    const [r,g,b]=oklabToLin(L,c*Math.cos(hr),c*Math.sin(hr));
+    if(r>-1e-4&&r<1.0001&&g>-1e-4&&g<1.0001&&b>-1e-4&&b<1.0001)return '#'+[r,g,b].map(v=>enc(v).toString(16).padStart(2,'0')).join('');
+    c*=.9;
+  }
+  const [r,g,b]=oklabToLin(L,0,0);return '#'+[r,g,b].map(v=>enc(v).toString(16).padStart(2,'0')).join('');
+}
+const hueDiff=(a,b)=>{const d=Math.abs(a-b)%360;return d>180?360-d:d;};
+const labDist=(x,y)=>{const A=hexToOklab(x),B=hexToOklab(y);return Math.hypot(A[0]-B[0],A[1]-B[1],A[2]-B[2]);};
 
 /* ================= Random ================= */
 function mulberry32(a){return function(){a|=0;a=a+0x6D2B79F5|0;let t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296;};}
@@ -488,7 +524,7 @@ const shuffled=(a,r=Math.random)=>{a=a.slice();for(let i=a.length-1;i>0;i--){con
    The picture is a background color plus up to five soft shapes ("layers").
    Each layer has its own color, position and shape. Layers are stored bottom→top. */
 const MAX_LAYERS=5;
-const DEF={blur:40,grain:10,ratio:'9:16',w:1080,h:1920,imageFormat:'png',videoFormat:'mp4',motion:{on:false,loop:8,flow:55}};
+const DEF={blur:40,grain:10,pattern:{type:'none',strength:40,scale:50},ratio:'9:16',w:1080,h:1920,imageFormat:'png',videoFormat:'mp4',motion:{on:false,loop:8,flow:55}};
 const LAYER_DEF={size:.38,stretch:1.6,angle:0,soft:.8,alpha:.9};
 function makeLayer(hex,o={},r=Math.random){
   return Object.assign({id:uid('l'),hex,x:rnd(.15,.85,r),y:rnd(.15,.85,r),size:rnd(.3,.44,r),stretch:rnd(1.3,2.4,r),angle:rnd(-25,25,r),soft:.8,alpha:rnd(.82,1,r)},o);
@@ -539,48 +575,43 @@ const layerById=id=>state.layers.find(l=>l.id===id);
 const selLayer=()=>layerById(ui.sel)||null;
 
 /* ================= Recommendations ================= */
-// Recommendations stay inside the picture's mood: they only use hues, saturation
-// and lightness that are already present (plus a small margin), built by
-//   1) blending two existing colors,
-//   2) making an existing color a little lighter or darker,
-//   3) nudging an existing hue slightly to a neighbouring one.
-// Nothing jumps to a complementary or unrelated hue.
-const softPastel=()=>hslHex([rnd(0,360),rnd(40,62),rnd(72,86)]);
+// Recommendations follow how harmonious gradients are built:
+//   - colors sit along one continuous path on the color wheel (no jumps),
+//   - neighbours differ mostly in lightness, which is what makes them melt together,
+//   - between two distant hues, a "bridge" color keeps the in-between hue as vivid
+//     as its parents, so the blend never passes through grey.
+// Everything is worked out in OKLCH, so lightness and vividness steps look even.
 function recommend(excludeId){
   const others=state.layers.filter(l=>l.id!==excludeId).map(l=>l.hex);
   if(excludeId!=='bg')others.push(state.bg);
-  const hsl=others.map(h=>rgbToHsl(hexToRgb(h)));
-  // A color only steers the hue if it is visibly colored (not near white, gray or black).
-  const chroma=h=>{const c=hexToRgb(h);return Math.max(...c)-Math.min(...c);};
-  const tinted=hsl.filter((c,i)=>chroma(others[i])>24);
-  if(!tinted.length){const out=[];while(out.length<6){const h=softPastel();if(!out.some(x=>dist(x,h)<40))out.push(h);}return out;}
-  const S=hsl.map(c=>c[1]),L=hsl.map(c=>c[2]);
-  const TS=tinted.map(c=>c[1]),sLo=Math.max(8,Math.min(...S)-6),sHi=Math.min(100,Math.max(...TS)+2);
-  const lLo=Math.max(12,Math.min(...L)-10),lHi=Math.min(96,Math.max(...L)+10);
-  const fit=([h,s,l])=>hslHex([h,clamp(s,sLo,sHi),clamp(l,lLo,lHi)]);
-  const J=a=>(Math.random()*2-1)*a,pick=a=>a[Math.floor(Math.random()*a.length)];
-  const cands=[];
-  for(let i=0;i<14&&others.length>1;i++){ // blends
-    const a=pick(others),b=pick(others);if(a===b)continue;
-    const m=rgbToHsl(hexToRgb(mixHex(a,b,rnd(.3,.7))));m[1]*=1.12;cands.push(fit(m));
+  const lch=others.map(hexToOklch),tinted=lch.filter(c=>c[1]>.03);
+  if(!tinted.length){ // a near-neutral picture: offer one gentle pastel family
+    const h0=rnd(0,360);return Array.from({length:6},(_,i)=>oklchToHex([.9-i*.045,.06+.012*i,h0+i*12]));
   }
-  for(const c of tinted){ // lighter / darker versions
-    cands.push(fit([c[0]+J(5),c[1]+J(5),c[2]+rnd(8,15)]));
-    cands.push(fit([c[0]+J(5),c[1]+J(5),c[2]-rnd(8,15)]));
+  const Ls=lch.map(c=>c[0]),Cs=tinted.map(c=>c[1]);
+  const lLo=Math.max(.25,Math.min(...Ls)-.1),lHi=Math.min(.97,Math.max(...Ls)+.08),cHi=Math.max(...Cs)*1.05;
+  const fit=([L,C,H])=>oklchToHex([clamp(L,lLo,lHi),clamp(C,0,cHi),(H%360+360)%360]);
+  const J=a=>(Math.random()*2-1)*a,cands=[];
+  for(let i=0;i<tinted.length;i++)for(let j=i+1;j<tinted.length;j++){ // bridges
+    const a=tinted[i],b=tinted[j],dh=((b[2]-a[2]+540)%360)-180;if(Math.abs(dh)<18)continue;
+    for(const t of Math.abs(dh)>90?[.33,.67]:[.5])cands.push(fit([a[0]+(b[0]-a[0])*t+J(.03),Math.max(a[1],b[1])*rnd(.85,1),a[2]+dh*t+J(4)]));
   }
-  for(const c of tinted){ // neighbouring hues
-    const d=(Math.random()<.5?-1:1)*rnd(10,18);
-    cands.push(fit([c[0]+d,c[1]*rnd(.82,.98),c[2]+J(5)]));
+  for(const c of tinted){ // lightness steps (lighter ones a little softer)
+    cands.push(fit([c[0]+rnd(.08,.14),c[1]*rnd(.6,.8),c[2]+J(4)]));
+    cands.push(fit([c[0]-rnd(.08,.14),c[1]*rnd(.95,1.1),c[2]+J(4)]));
+  }
+  for(const c of tinted){ // a small step to a neighbouring hue
+    const d=(Math.random()<.5?-1:1)*rnd(12,22);cands.push(fit([c[0]+J(.04),c[1]*rnd(.85,1),c[2]+d]));
   }
   const out=[];
-  for(const minOther of [30,22,14])for(const h of shuffled(cands)){
+  for(const near of [.07,.05,.035])for(const h of shuffled(cands)){
     if(out.length===6)break;
-    if(others.some(x=>dist(x,h)<minOther)||out.some(x=>dist(x,h)<24))continue;
+    if(others.some(x=>labDist(x,h)<near)||out.some(x=>labDist(x,h)<.055))continue;
     out.push(h);
   }
-  while(out.length<6)out.push(fit([pick(tinted)[0]+J(20),rnd(sLo,sHi),rnd(lLo,lHi)]));
-  // Order by hue, then lightness, so the six read as one tidy palette.
-  return out.map(h=>[h,rgbToHsl(hexToRgb(h))]).sort((a,b)=>(Math.round(a[1][0]/20)-Math.round(b[1][0]/20))||(b[1][2]-a[1][2])).map(x=>x[0]);
+  while(out.length<6){const c=tinted[Math.floor(Math.random()*tinted.length)];out.push(fit([c[0]+J(.15),c[1]*rnd(.6,1),c[2]+J(25)]));}
+  // order by hue, then lightness, so the six read as one tidy palette
+  return out.map(h=>[h,hexToOklch(h)]).sort((a,b)=>(Math.round(a[1][2]/20)-Math.round(b[1][2]/20))||(b[1][0]-a[1][0])).map(x=>x[0]);
 }
 
 /* ================= Render pipeline ================= */
@@ -600,23 +631,48 @@ function motionOf(b,t,k){
   const [a1,a2,a3,a4,a5,a6]=seedsOf(b.id),T=Math.PI*2,f1=a1<.5?1:2,f2=a2<.5?1:2,A=.13*k;
   return {dx:A*Math.sin(T*(f1*t+a3)),dy:A*.85*Math.sin(T*(f2*t+a4)),ds:1+.14*k*Math.sin(T*(t+a5)),da:22*k*Math.sin(T*(t+a6))};
 }
+/* Color field. Same composition as before (each shape laid over the background
+   in order, with the same soft falloff), but every blend step happens in OKLab
+   and keeps the colors' vividness. So where two colors meet you get a clean
+   in-between hue instead of a grey, muddy one. Computed at reduced resolution;
+   the blur and upscale that follow smooth it out. */
+const fieldC=document.createElement('canvas');
+function paintField(o,FW,FH,s,off,LW,LH,U,anim,phase,k){
+  const q=.42,w=Math.max(8,Math.round(FW*q)),h=Math.max(8,Math.round(FH*q));
+  if(fieldC.width!==w)fieldC.width=w;if(fieldC.height!==h)fieldC.height=h;
+  const fx=fieldC.getContext('2d'),img=fx.createImageData(w,h),D=img.data;
+  const bg=hexToOklab(s.bg),bgC=Math.hypot(bg[1],bg[2]);
+  const Ls=s.layers.map(b=>{
+    let bx=b.x,by=b.y,bs=b.size,ba=b.angle;
+    if(anim){const m=motionOf(b,phase,k);bx+=m.dx;by+=m.dy;bs*=m.ds;ba+=m.da;}
+    const r=Math.max(.5,bs*U*q),sx=Math.sqrt(b.stretch),a=ba*Math.PI/180,lab=hexToOklab(b.hex);
+    return {cx:(off+bx*LW)*q,cy:(off+by*LH)*q,co:Math.cos(a),si:Math.sin(a),irx:1/(r*sx),iry:sx/r,
+      inner:Math.max(.02,1-b.soft),al:b.alpha,L:lab[0],A:lab[1],B:lab[2],C:Math.hypot(lab[1],lab[2])};
+  });
+  let i4=0;
+  for(let y=0;y<h;y++)for(let x=0;x<w;x++){
+    let L=bg[0],A=bg[1],B=bg[2],C=bgC;
+    for(let j=0;j<Ls.length;j++){
+      const l=Ls[j],dx=x-l.cx,dy=y-l.cy,u=(dx*l.co+dy*l.si)*l.irx,v=(dy*l.co-dx*l.si)*l.iry,d2=u*u+v*v;
+      if(d2>=1)continue;
+      const d=Math.sqrt(d2);let t=d<=l.inner?1:(1-d)/(1-l.inner);t=t*t*(3-2*t)*l.al;
+      L+=(l.L-L)*t;A+=(l.A-A)*t;B+=(l.B-B)*t;C+=(l.C-C)*t;
+      const c=Math.hypot(A,B);if(c>1e-5){const f=Math.min(2.2,C/c);A*=f;B*=f;}   // keep the blend as vivid as its colors
+    }
+    const rgb=oklabToLin(L,A,B);
+    D[i4]=enc(rgb[0]);D[i4+1]=enc(rgb[1]);D[i4+2]=enc(rgb[2]);D[i4+3]=255;i4+=4;
+  }
+  fx.putImageData(img,0,0);
+  o.imageSmoothingEnabled=true;o.imageSmoothingQuality='high';o.drawImage(fieldC,0,0,FW,FH);
+}
 function renderTo(canvas,W,H,s=state,phase=null){
   if(!(W>=1&&H>=1&&isFinite(W)&&isFinite(H)))return;
   const anim=phase!==null&&s.motion&&s.motion.on,k=anim?s.motion.flow/100:0;
   const LW=Math.max(40,Math.round(Math.sqrt(230400*W/H))),LH=Math.max(40,Math.round(LW*H/W));
   const U=Math.sqrt(LW*LH),M=Math.round(U*.35);
   lowA.width=lowB.width=LW+2*M;lowA.height=lowB.height=LH+2*M;
-  const o=lowA.getContext('2d');
-  o.globalAlpha=1;o.fillStyle=s.bg;o.fillRect(0,0,lowA.width,lowA.height);
-  for(const b of s.layers){
-    let bx=b.x,by=b.y,bs=b.size,ba=b.angle;
-    if(anim){const m=motionOf(b,phase,k);bx+=m.dx;by+=m.dy;bs*=m.ds;ba+=m.da;}
-    const r=bs*U,sx=Math.sqrt(b.stretch);
-    o.save();o.translate(M+bx*LW,M+by*LH);o.rotate(ba*Math.PI/180);o.scale(sx,1/sx);
-    const g=o.createRadialGradient(0,0,0,0,0,r);
-    g.addColorStop(0,b.hex);g.addColorStop(clamp(1-b.soft,.02,.98),b.hex);g.addColorStop(1,b.hex+'00');
-    o.globalAlpha=b.alpha;o.fillStyle=g;o.beginPath();o.arc(0,0,r,0,Math.PI*2);o.fill();o.restore();
-  }
+  const o=lowA.getContext('2d');o.globalAlpha=1;
+  paintField(o,lowA.width,lowA.height,s,M,LW,LH,U,anim,phase,k);
   const p=lowB.getContext('2d');p.clearRect(0,0,lowB.width,lowB.height);
   const bl=s.blur/100*.075*U;
   if(bl>.1&&HAS_FILTER){p.filter=`blur(${bl.toFixed(1)}px)`;p.drawImage(lowA,0,0);p.filter='none';}
@@ -629,11 +685,50 @@ function renderTo(canvas,W,H,s=state,phase=null){
   const ctx=canvas.getContext('2d');ctx.globalAlpha=1;ctx.globalCompositeOperation='source-over';
   ctx.imageSmoothingEnabled=true;ctx.imageSmoothingQuality='high';
   ctx.drawImage(lowB,M,M,LW,LH,0,0,W,H);
+  drawPattern(ctx,W,H,s.pattern);
   if(s.grain>0){
     const pat=ctx.createPattern(noiseTile,'repeat'),gk=Math.max(.35,Math.sqrt(W*H)/1440);
     if(pat.setTransform)pat.setTransform(new DOMMatrix().scale(gk)); // fixed texture, never re-randomized per frame
     ctx.save();ctx.globalCompositeOperation='soft-light';ctx.globalAlpha=s.grain/100*1.6;ctx.fillStyle=pat;ctx.fillRect(0,0,W,H);ctx.restore();
   }
+}
+
+/* ================= Line patterns =================
+   Thin white lines laid over the gradient (under the grain), like the
+   contour lines, ripples and dot grids on editorial cover art. */
+const PATTERNS=[['none','None'],['contour','Contour'],['waves','Waves'],['flow','Flow'],['ripples','Ripples'],['arcs','Arcs'],['rays','Rays'],
+  ['spiral','Spiral'],['dots','Dots'],['grid','Grid'],['diagonal','Diagonal'],['cross','Crosshatch'],['petals','Petals'],['lines','Lines']];
+function drawPattern(ctx,W,H,p,zoom=1){
+  if(!p||!p.type||p.type==='none')return;
+  const S=Math.min(W,H),sc=.55+(p.scale??50)/100*1.3,sp=S*.046*sc*zoom,lw=Math.max(.8,S*.0019*zoom),PI=Math.PI;
+  ctx.save();ctx.globalCompositeOperation='source-over';ctx.globalAlpha=.1+(p.strength??40)/100*.55;
+  ctx.strokeStyle='#fff';ctx.fillStyle='#fff';ctx.lineWidth=lw;ctx.lineCap='round';ctx.lineJoin='round';
+  const path=(f,n=180)=>{ctx.beginPath();for(let k=0;k<=n;k++){const [x,y]=f(k/n);k?ctx.lineTo(x,y):ctx.moveTo(x,y);}ctx.stroke();};
+  switch(p.type){
+    case 'contour': // topographic lines that drift and bunch like a map
+      for(let y0=-S*.25;y0<H+S*.25;y0+=sp)path(t=>{const x=t*W,u=x/S,v=y0/S;return [x,y0+S*(.05*Math.sin(u*2.6+v*1.7)+.028*Math.sin(u*6.3-v*3.1)+.012*Math.sin(u*13+v*5))];});break;
+    case 'waves':
+      for(let y0=-sp;y0<H+sp;y0+=sp)path(t=>{const x=t*W;return [x,y0+sp*.32*Math.sin(x/sp*.8+y0/sp*.55)];});break;
+    case 'flow': // streamlines through a gentle field
+      for(let y0=-H*.25;y0<H*1.25;y0+=sp*1.2){ctx.beginPath();let x=-S*.05,y=y0;ctx.moveTo(x,y);
+        for(let k=0;k<400&&x<W+S*.05;k++){const a=.55*Math.sin(y/S*3.2+x/S*1.4)+.25*Math.sin(x/S*4.1);x+=Math.cos(a)*S*.006;y+=Math.sin(a)*S*.006;ctx.lineTo(x,y);}ctx.stroke();}break;
+    case 'ripples':{const cx=W*.5,cy=H*.62,R=Math.hypot(W,H);for(let r=sp;r<R;r+=sp){ctx.beginPath();ctx.arc(cx,cy,r,0,2*PI);ctx.stroke();}break;}
+    case 'arcs':{const R=Math.hypot(W,H)*1.05;for(let r=sp;r<R;r+=sp){ctx.beginPath();ctx.arc(0,H,r,-PI/2,0);ctx.stroke();}break;}
+    case 'rays':{const cx=W*.5,cy=H*1.02,R=Math.hypot(W,H)*1.2,n=Math.max(12,Math.round(60/sc/zoom));
+      ctx.beginPath();for(let i=0;i<=n;i++){const a=PI+i/n*PI;ctx.moveTo(cx,cy);ctx.lineTo(cx+Math.cos(a)*R,cy+Math.sin(a)*R);}ctx.stroke();break;}
+    case 'spiral':{const cx=W*.5,cy=H*.5,R=Math.hypot(W,H)*.6,b=sp/(2*PI);ctx.beginPath();
+      for(let th=0;b*th<R;th+=.04){const r=b*th,x=cx+r*Math.cos(th),y=cy+r*Math.sin(th);th?ctx.lineTo(x,y):ctx.moveTo(x,y);}ctx.stroke();break;}
+    case 'dots':{const g=sp*1.15,rad=Math.max(1,S*.0048*zoom);ctx.beginPath();
+      for(let y=g/2;y<H;y+=g)for(let x=g/2;x<W;x+=g){ctx.moveTo(x+rad,y);ctx.arc(x,y,rad,0,2*PI);}ctx.fill();break;}
+    case 'grid':{const g=sp*1.6;ctx.beginPath();for(let x=g/2;x<W;x+=g){ctx.moveTo(x,0);ctx.lineTo(x,H);}for(let y=g/2;y<H;y+=g){ctx.moveTo(0,y);ctx.lineTo(W,y);}ctx.stroke();break;}
+    case 'diagonal':case 'cross':{const g=sp*1.1;ctx.beginPath();
+      for(let c=-H;c<W+H;c+=g){ctx.moveTo(c,0);ctx.lineTo(c+H,H);if(p.type==='cross'){ctx.moveTo(c+H,0);ctx.lineTo(c,H);}}ctx.stroke();break;}
+    case 'petals':{const n=Math.max(3,Math.round(6/sc)),base=H*1.02;
+      for(let i=0;i<n;i++){const cx=W*((i+.5)/n),wd=W/n*.45*(1+.25*Math.sin(i*1.7)),top=base-H*.5*(.7+.3*Math.cos(i*1.3)),mid=(base+top)/2;
+        ctx.beginPath();ctx.moveTo(cx,base);ctx.quadraticCurveTo(cx-wd*2,mid,cx,top);ctx.quadraticCurveTo(cx+wd*2,mid,cx,base);ctx.moveTo(cx,base);ctx.lineTo(cx,top);ctx.stroke();}break;}
+    case 'lines':{const g=sp*.8;ctx.beginPath();for(let y=g/2;y<H;y+=g){ctx.moveTo(0,y);ctx.lineTo(W,y);}ctx.stroke();break;}
+  }
+  ctx.restore();
 }
 
 /* ================= Preview loop ================= */
@@ -806,7 +901,7 @@ const layerShows=[
 })));
 const lookShows=[
   {key:'blur',label:'Blur',min:0,max:100,step:1,def:DEF.blur,fmt:v=>Math.round(v)},
-  {key:'grain',label:'Texture',min:0,max:40,step:1,def:DEF.grain,fmt:v=>Math.round(v)},
+  {key:'grain',label:'Texture',min:0,max:70,step:1,def:DEF.grain,fmt:v=>Math.round(v)},
 ].map(cfg=>buildSlider($('lookSliders'),Object.assign(cfg,{get:()=>state[cfg.key],set:v=>{state[cfg.key]=v;requestRender();}})));
 const motionShows=[buildSlider($('motionSliders'),{label:'Flow',min:5,max:100,step:1,def:55,fmt:v=>Math.round(v),
   get:()=>state.motion.flow,set:v=>{state.motion.flow=v;requestRender();}})];
@@ -815,6 +910,31 @@ function renderSeg(el,opts,cur,pick){
   opts.forEach(([v,label])=>{const b=document.createElement('button');b.textContent=label;b.classList.toggle('on',v===cur);b.onclick=()=>pick(v);el.appendChild(b);});
 }
 function renderLook(){lookShows.forEach(f=>f());}
+const patternShows=[
+  {key:'strength',label:'Strength',min:0,max:100,step:1,def:40,fmt:v=>Math.round(v)},
+  {key:'scale',label:'Spacing',min:0,max:100,step:1,def:50,fmt:v=>Math.round(v)},
+].map(cfg=>buildSlider($('patternSliders'),Object.assign(cfg,{get:()=>state.pattern[cfg.key],set:v=>{state.pattern[cfg.key]=v;requestRender();}})));
+function buildPatterns(){
+  const box=$('patterns');box.innerHTML='';
+  PATTERNS.forEach(([v,name])=>{
+    const b=document.createElement('button');b.className='preset';b.dataset.name=name;b.dataset.v=v;b.setAttribute('aria-label','Pattern: '+name);
+    let t;
+    if(v==='none'){t=document.createElement('div');t.className='blank';t.innerHTML=icon('none',14);}
+    else{
+      t=document.createElement('canvas');t.width=t.height=96;const x=t.getContext('2d'),g=x.createLinearGradient(0,0,0,96);
+      g.addColorStop(0,'#9aa6c6');g.addColorStop(1,'#535873');x.fillStyle=g;x.fillRect(0,0,96,96);
+      drawPattern(x,96,96,{type:v,strength:80,scale:50},2.1);
+    }
+    b.appendChild(t);
+    b.onclick=()=>{state.pattern.type=v;renderPattern();requestRender();commit(true);};
+    box.appendChild(b);
+  });
+}
+function renderPattern(){
+  [...$('patterns').children].forEach(b=>b.classList.toggle('on',b.dataset.v===state.pattern.type));
+  $('patternSliders').hidden=state.pattern.type==='none';
+  patternShows.forEach(f=>f());
+}
 
 /* ================= Ratio + custom size ================= */
 const RATIOS=[['9:16',9,16],['3:4',3,4],['4:5',4,5],['1:1',1,1],['4:3',4,3],['16:9',16,9]];
@@ -1157,11 +1277,16 @@ function mapPalette(pal,base){
   return {bg:pal.bg,hexes};
 }
 function setColors(c){state.bg=c.bg;state.layers.forEach((l,i)=>{if(c.hexes[i])l.hex=c.hexes[i];});renderLayers();renderHandles();requestRender();}
-// A fresh, harmonious palette: one base hue, close neighbours, a spread of light and dark.
+// A fresh, harmonious palette: walk 50-120 degrees around the color wheel,
+// light and soft at one end, deeper and richer at the other (a deep end with
+// little chroma reads as mud, so vividness grows as the colors get darker). Now and then
+// a quiet complementary touch at the light end, kept low in chroma so it never muddies.
 function surprisePalette(){
-  const h=rnd(0,360),s=rnd(38,72),dir=Math.random()<.5?-1:1;
-  const colors=[[h,s,rnd(42,55)],[h+dir*rnd(15,30),s*.9,rnd(62,72)],[h-dir*rnd(10,25),s*.6,rnd(84,93)],[h+dir*rnd(30,50),s*.8,rnd(52,66)]].map(hslHex);
-  return {name:'Surprise',bg:hslHex([h+dir*8,s*.75,rnd(62,72)]),colors};
+  const h0=rnd(0,360),span=(Math.random()<.5?-1:1)*rnd(50,120),c0=rnd(.08,.15),top=rnd(.84,.93),bottom=rnd(.44,.6);
+  const pt=t=>[top+(bottom-top)*t,c0*(.45+.75*t),h0+span*t];
+  const colors=[0,.33,.66,1].map(t=>oklchToHex(pt(t)));
+  if(Math.random()<.3)colors[0]=oklchToHex([top,c0*.35,h0+180]);
+  return {name:'Surprise',bg:oklchToHex(pt(.5)),colors};
 }
 function renderRecolor(){
   const box=$('rcList');box.innerHTML='';
@@ -1322,7 +1447,7 @@ function fitFrame(){
 }
 new ResizeObserver(()=>fitFrame()).observe(stage);
 
-function renderAll(){renderPresets();renderLayers();renderLook();renderMotion();renderExport();renderRatioBar();renderToolbar();renderHandles();requestRender();syncAnim();}
+function renderAll(){renderPresets();renderLayers();renderPattern();renderLook();renderMotion();renderExport();renderRatioBar();renderToolbar();renderHandles();requestRender();syncAnim();}
 
 /* ================= First visit: welcome screen =================
    Only a moving gradient, the name and one button. The background slowly
@@ -1389,7 +1514,7 @@ function closeWelcome(){
 $('wGo').onclick=closeWelcome;
 // New design = a blank canvas with default effects (the canvas ratio is kept).
 function newDesign(){
-  state.blur=DEF.blur;state.grain=DEF.grain;state.motion=JSON.parse(JSON.stringify(DEF.motion));ui.paused=false;
+  state.blur=DEF.blur;state.grain=DEF.grain;state.pattern=JSON.parse(JSON.stringify(DEF.pattern));state.motion=JSON.parse(JSON.stringify(DEF.motion));ui.paused=false;
   applyPreset(presetData.findIndex(p=>p.name==='Blank'));
 }
 $('wNew').onclick=()=>{newDesign();closeWelcome();};
@@ -1399,6 +1524,7 @@ window.addEventListener('resize',()=>{if(!$('welcome').hidden)drawWelcome();});
 /* ================= Init ================= */
 hydrateIcons();
 buildPresets();
+buildPatterns();
 renderAll();
 fitFrame();
 commit(true);
