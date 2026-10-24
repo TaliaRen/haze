@@ -25,9 +25,8 @@ No sign-up, no install. It runs entirely in your browser.
 
 - **Start from a mood.** Sky, Lavender, Sage, Grass, Sunset and Dusk, or a blank canvas.
 - **Shape it on the canvas.** Drag a dot to move a shape. Use its handles to resize, rotate and stretch it.
-- **Colors that fit.** Every color picker suggests six colors that match the rest of your picture, or you can pick your own. Suggestions follow one path around the color wheel, step mostly in lightness, and add vivid in-between hues so nothing turns muddy.
+- **Colors that fit.** Every color picker suggests six colors that match the rest of your picture, or you can pick your own.
 - **Recolor.** Keep the layout you love and try a whole new palette. Hover to preview, click to apply.
-- **Line patterns.** Lay thin white lines over the gradient: Contour, Waves, Flow, Ripples, Arcs, Rays, Spiral, Dots, Grid, Diagonal, Crosshatch, Petals or Lines, with adjustable strength and spacing.
 - **Still or Motion.** In Motion, shapes drift slowly in a loop that repeats seamlessly.
 - **Any size.** 9:16, 3:4, 4:5, 1:1, 4:3, 16:9 or a custom size.
 - **Export.** PNG, JPG and WebP images, or MP4 and WebM video loops.
@@ -48,12 +47,11 @@ No sign-up, no install. It runs entirely in your browser.
 
 ## How it works
 
-- Each shape is a soft falloff painted on a small canvas, blurred, then scaled up, which keeps rendering fast at any export size.
-- Colors are blended in OKLab, a perceptual color space, and keep their vividness where they meet, so the area between two colors is a clean in-between hue instead of grey.
-- Line patterns are drawn at full resolution, then a fixed grain texture is laid on top with a soft-light blend, so motion never flickers.
+- Each shape is a soft radial gradient painted on a small canvas, blurred, then scaled up, which keeps rendering fast at any export size.
+- A fixed grain texture is laid on top with a soft-light blend, so motion never flickers.
 - Motion paths use whole-number frequencies, so the first and last frame of a loop match exactly.
 - Video is recorded in real time with the browser's `MediaRecorder`.
-- Color suggestions and Surprise palettes are built in OKLCH from the colors already in your picture.
+- Color suggestions stay inside the hues, saturation and lightness already in your picture.
 
 ## Browser support
 
